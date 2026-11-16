@@ -1,0 +1,534 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>The Reading Room</title>
+  
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {}
+      }
+    }
+  </script>
+
+  <!-- Global Styles -->
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500&family=Inter:wght@300;400;500;600&family=Dancing+Script:wght@600;700&display=swap');
+    
+    :root {
+      --bg-light: #FDFBF7;
+      --bg-dark: #121212;
+    }
+    html.dark { background-color: var(--bg-dark); color: #e5e5e5; }
+    body { background-color: var(--bg-light); transition: background-color 0.3s ease; margin: 0; padding: 0;}
+    html.dark body { background-color: var(--bg-dark); }
+    .font-serif { font-family: 'Lora', serif; }
+    .font-sans { font-family: 'Inter', sans-serif; }
+    .font-cursive { font-family: 'Dancing Script', cursive; }
+    
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: #d6d3d1; border-radius: 10px; }
+    html.dark ::-webkit-scrollbar-thumb { background: #3f3f46; }
+    ::-webkit-scrollbar-thumb:hover { background: #a8a29e; }
+    
+    .glass-nav { background: rgba(253, 251, 247, 0.85); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); }
+    html.dark .glass-nav { background: rgba(18, 18, 18, 0.85); }
+    .book-shadow { box-shadow: -4px 0 15px rgba(0,0,0,0.05), inset 2px 0 3px rgba(255,255,255,0.3); }
+    html.dark .book-shadow { box-shadow: -4px 0 15px rgba(0,0,0,0.3), inset 2px 0 3px rgba(255,255,255,0.05); }
+  </style>
+
+  <!-- React & Babel -->
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+  <!-- PDF.js -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
+  <script>
+    window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
+  </script>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect, useRef, useMemo, useCallback } = React;
+
+    // ============================================================================
+    // ICONS (Inline SVGs to replace lucide-react dependencies)
+    // ============================================================================
+    const Search = ({size=24, className=""}) => <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>;
+    const Book = ({size=24, className=""}) => <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20"/></svg>;
+    const Heart = ({size=24, fill="none", className=""}) => <svg width={size} height={size} viewBox="0 0 24 24" fill={fill} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/></svg>;
+    const Sun = ({size=24, className=""}) => <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>;
+    const Moon = ({size=24, className=""}) => <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>;
+    const Download = ({size=24, className=""}) => <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>;
+    const ArrowLeft = ({size=24, className=""}) => <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="m12 19-7-7 7-7M19 12H5"/></svg>;
+    const Maximize2 = ({size=24, className=""}) => <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>;
+    const Minimize2 = ({size=24, className=""}) => <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><polyline points="4 14 10 14 10 20"/><polyline points="20 10 14 10 14 4"/><line x1="14" y1="10" x2="21" y2="3"/><line x1="3" y1="21" x2="10" y2="14"/></svg>;
+    const BookOpen = ({size=24, className=""}) => <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>;
+    const X = ({size=24, className=""}) => <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M18 6 6 18M6 6l12 12"/></svg>;
+    const AlertCircle = ({size=24, className=""}) => <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>;
+
+    // ============================================================================
+    // CONFIGURATION
+    // ============================================================================
+    const CONFIG = {
+      GITHUB_OWNER: "iamrvii7", 
+      GITHUB_REPO: "Library",
+      GITHUB_BRANCH: "master",
+    };
+
+    // ============================================================================
+    // METADATA DICTIONARY
+    // ============================================================================
+    const KNOWN_METADATA = {
+      "1984": { category: "Fiction & Classics" },
+      "Animal Farm": { category: "Fiction & Classics" },
+      "Animal-Farm": { category: "Fiction & Classics" },
+      "White Nights": { category: "World Literature" },
+      "White-Nights": { category: "World Literature" },
+      "Kafka on the Shore": { category: "Japanese Literature" },
+      "Kafka-on-the-Shore": { category: "Japanese Literature" },
+      "Norwegian Wood": { category: "Japanese Literature" },
+      "Norwegian-Wood": { category: "Japanese Literature" },
+      "Gunahon Ka Devta": { category: "Hindi Sahitya" },
+      "Gunahon-Ka-Devta": { category: "Hindi Sahitya" },
+      "Raag Darbari": { category: "Hindi Sahitya" },
+      "Raag-Darbari": { category: "Hindi Sahitya" },
+      "Aaj Din Chadheya": { category: "Music & Lyrics" },
+      "Guru Randhawa": { category: "Music & Lyrics" },
+      "Glass Animals - Heat Waves": { title: "Heat Waves", category: "Music & Lyrics" },
+      "Maine Tum Ko Chaha": { category: "Music & Lyrics" }
+    };
+
+    // ============================================================================
+    // UTILITIES
+    // ============================================================================
+    const getRawUrl = (path, branch) => `https://raw.githubusercontent.com/${CONFIG.GITHUB_OWNER}/${CONFIG.GITHUB_REPO}/${branch}/${path}`;
+
+    const getCoverStyle = (title) => {
+      const themes = [
+        { bg: 'bg-[#3C4A3E]', text: 'text-[#E8EAE6]', border: 'border-[#2A342B]' },
+        { bg: 'bg-[#8C4A42]', text: 'text-[#F3EBE9]', border: 'border-[#6B3731]' },
+        { bg: 'bg-[#2C3E50]', text: 'text-[#EAECEE]', border: 'border-[#1A252F]' },
+        { bg: 'bg-[#D4A373]', text: 'text-[#4A3B2C]', border: 'border-[#B88B5E]' },
+        { bg: 'bg-[#4A4E69]', text: 'text-[#F2E9E4]', border: 'border-[#36394D]' },
+      ];
+      let hash = 0;
+      for (let i = 0; i < (title || "").length; i++) hash = title.charCodeAt(i) + ((hash << 5) - hash);
+      return themes[Math.abs(hash) % themes.length];
+    };
+
+    // ============================================================================
+    // GITHUB API SERVICES
+    // ============================================================================
+    async function fetchGithubApi(endpoint, method = 'GET', body = null, token = null) {
+      const headers = { 'Accept': 'application/vnd.github.v3+json' };
+      if (token) headers['Authorization'] = `token ${token}`;
+      
+      const options = { method, headers };
+      if (body) options.body = JSON.stringify(body);
+      
+      const res = await fetch(`https://api.github.com/repos/${CONFIG.GITHUB_OWNER}/${CONFIG.GITHUB_REPO}${endpoint}`, options);
+      if (!res.ok && res.status !== 404) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.message || `GitHub API Error: ${res.status}`);
+      }
+      return res;
+    }
+
+    // ============================================================================
+    // CUSTOM HOOKS
+    // ============================================================================
+    function useDarkMode() {
+      const [isDark, setIsDark] = useState(() => {
+        const saved = localStorage.getItem('theme');
+        if (saved) return saved === 'dark';
+        return window.matchMedia('(prefers-color-scheme: dark)').matches;
+      });
+
+      useEffect(() => {
+        const root = window.document.documentElement;
+        if (isDark) { root.classList.add('dark'); localStorage.setItem('theme', 'dark'); } 
+        else { root.classList.remove('dark'); localStorage.setItem('theme', 'light'); }
+      }, [isDark]);
+
+      return [isDark, setIsDark];
+    }
+
+    function useUserLibrary() {
+      const [favorites, setFavorites] = useState(() => JSON.parse(localStorage.getItem('readingRoom_favorites') || '[]'));
+      const [history, setHistory] = useState(() => JSON.parse(localStorage.getItem('readingRoom_history') || '[]'));
+
+      useEffect(() => { localStorage.setItem('readingRoom_favorites', JSON.stringify(favorites)); }, [favorites]);
+      useEffect(() => { localStorage.setItem('readingRoom_history', JSON.stringify(history)); }, [history]);
+
+      const toggleFavorite = (bookId) => setFavorites(prev => prev.includes(bookId) ? prev.filter(id => id !== bookId) : [...prev, bookId]);
+      const addToHistory = (book) => setHistory(prev => [{ ...book, lastRead: new Date().toISOString() }, ...prev.filter(b => b.id !== book.id)].slice(0, 10));
+
+      return { favorites, toggleFavorite, history, addToHistory };
+    }
+
+    // ============================================================================
+    // COMPONENTS
+    // ============================================================================
+
+    const PdfCover = ({ url, fallbackTitle, style }) => {
+      const canvasRef = useRef(null);
+      const [loaded, setLoaded] = useState(false);
+
+      useEffect(() => {
+        let renderTask = null;
+        let isMounted = true;
+
+        const renderPdf = async () => {
+          if (!window.pdfjsLib || !url) return;
+          try {
+            const loadingTask = window.pdfjsLib.getDocument(url);
+            const pdf = await loadingTask.promise;
+            const page = await pdf.getPage(1);
+            
+            if (!isMounted) return;
+
+            const viewport = page.getViewport({ scale: 1.0 }); 
+            const canvas = canvasRef.current;
+            if (!canvas) return;
+            
+            const context = canvas.getContext('2d');
+            canvas.height = viewport.height;
+            canvas.width = viewport.width;
+            
+            renderTask = page.render({ canvasContext: context, viewport });
+            await renderTask.promise;
+            
+            if (isMounted) setLoaded(true);
+          } catch (error) {
+            console.error("Error rendering PDF cover:", error);
+          }
+        };
+
+        if (window.pdfjsLib) {
+          renderPdf();
+        } else {
+           const checkPdfJs = setInterval(() => {
+             if (window.pdfjsLib) {
+               clearInterval(checkPdfJs);
+               renderPdf();
+             }
+           }, 500);
+           return () => clearInterval(checkPdfJs);
+        }
+
+        return () => {
+          isMounted = false;
+          if (renderTask) renderTask.cancel();
+        };
+      }, [url]);
+
+      return (
+        <div className="absolute inset-0 w-full h-full bg-stone-100 dark:bg-stone-800">
+          {!loaded && (
+            <div className={`absolute inset-0 w-full h-full p-5 flex flex-col justify-between z-0 ${style.bg} ${style.text}`}>
+              <div>
+                <h3 className="font-serif font-bold text-lg leading-tight line-clamp-4">{fallbackTitle}</h3>
+              </div>
+              <div className="animate-pulse w-full h-1 bg-white/30 mt-4 rounded-full"></div>
+            </div>
+          )}
+          <canvas 
+            ref={canvasRef} 
+            className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-1000 z-10 ${loaded ? 'opacity-100' : 'opacity-0'}`} 
+          />
+        </div>
+      );
+    };
+
+    const BookCover = ({ book, className = "" }) => {
+      const style = getCoverStyle(book.title);
+      const rawPdfUrl = getRawUrl(book.file, book.branch || CONFIG.GITHUB_BRANCH);
+
+      return (
+        <div className={`relative overflow-hidden rounded-r-xl rounded-l-sm book-shadow flex flex-col justify-between transition-transform duration-500 group-hover:scale-[1.02] ${style.bg} ${style.border} border-l-4 ${className}`}>
+          <div className="absolute left-0 top-0 bottom-0 w-3 bg-black/10 mix-blend-overlay z-20 pointer-events-none" />
+          
+          <PdfCover url={rawPdfUrl} fallbackTitle={book.title} style={style} />
+          
+          <div className="absolute inset-0 bg-gradient-to-tr from-black/10 to-transparent pointer-events-none z-20" />
+        </div>
+      );
+    };
+
+    const BookCard = ({ book, onClick }) => (
+      <div className="group cursor-pointer flex flex-col gap-4 animate-in fade-in slide-in-from-bottom-4 duration-700" onClick={() => onClick(book)}>
+        <div className="aspect-[2/3] w-full"><BookCover book={book} className="w-full h-full" /></div>
+        <div>
+          <h4 className="font-serif font-medium text-stone-800 dark:text-stone-200 line-clamp-1 group-hover:text-amber-700 dark:group-hover:text-amber-500 transition-colors">{book.title}</h4>
+        </div>
+      </div>
+    );
+
+    const PDFReader = ({ book, onClose }) => {
+      const [isFullscreen, setIsFullscreen] = useState(false);
+      const rawPdfUrl = getRawUrl(book.file, book.branch || CONFIG.GITHUB_BRANCH);
+      const viewerUrl = `https://docs.google.com/gview?url=${encodeURIComponent(rawPdfUrl)}&embedded=true`;
+
+      return (
+        <div className={`fixed inset-0 z-50 flex flex-col bg-[#F5F5F5] dark:bg-[#0A0A0A] ${isFullscreen ? 'p-0' : 'p-0 sm:p-4 md:p-8'}`}>
+          <div className={`flex flex-col h-full bg-white dark:bg-[#1A1A1A] w-full max-w-6xl mx-auto shadow-2xl overflow-hidden transition-all duration-300 ${isFullscreen ? 'rounded-none' : 'rounded-2xl'}`}>
+            <header className="h-16 px-4 md:px-6 border-b border-stone-200 dark:border-stone-800 flex items-center justify-between shrink-0">
+              <div className="flex items-center gap-4 truncate">
+                <button onClick={onClose} className="p-2 -ml-2 rounded-full hover:bg-stone-100 dark:hover:bg-stone-800 text-stone-500"><ArrowLeft size={20} /></button>
+                <div className="truncate">
+                  <h2 className="font-serif font-medium text-stone-800 dark:text-stone-200 truncate">{book.title}</h2>
+                  <p className="text-xs font-sans text-stone-500 truncate">{book.category}</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <a href={rawPdfUrl} download target="_blank" rel="noreferrer" className="p-2 rounded-full hover:bg-stone-100 dark:hover:bg-stone-800 text-stone-500 hidden sm:block"><Download size={18} /></a>
+                <button onClick={() => setIsFullscreen(!isFullscreen)} className="p-2 rounded-full hover:bg-stone-100 dark:hover:bg-stone-800 text-stone-500 hidden sm:block">
+                  {isFullscreen ? <Minimize2 size={18} /> : <Maximize2 size={18} />}
+                </button>
+              </div>
+            </header>
+            <main className="flex-1 relative bg-stone-100 dark:bg-stone-900">
+              <iframe src={viewerUrl} className="w-full h-full border-none" title={`Reading ${book.title}`} />
+            </main>
+          </div>
+        </div>
+      );
+    };
+
+    const BookDetailsModal = ({ book, isOpen, onClose, onRead, isFavorite, onToggleFavorite }) => {
+      if (!isOpen || !book) return null;
+      const rawPdfUrl = getRawUrl(book.file, book.branch || CONFIG.GITHUB_BRANCH);
+
+      return (
+        <div className="fixed inset-0 z-40 flex items-center justify-center p-4 sm:p-6 md:p-12">
+          <div className="absolute inset-0 bg-stone-900/40 dark:bg-black/60 backdrop-blur-sm transition-opacity" onClick={onClose} />
+          <div className="relative w-full max-w-4xl bg-white dark:bg-[#1A1A1A] rounded-3xl shadow-2xl overflow-hidden flex flex-col md:flex-row max-h-full animate-in zoom-in-95 duration-300">
+            <button onClick={onClose} className="absolute top-4 right-4 p-2 bg-white/50 dark:bg-black/50 backdrop-blur-md rounded-full text-stone-600 dark:text-stone-300 hover:bg-stone-100 dark:hover:bg-stone-800 z-10"><X size={20} /></button>
+            <div className="w-full md:w-2/5 shrink-0 bg-stone-50 dark:bg-stone-900 p-8 md:p-12 flex items-center justify-center">
+              <div className="w-48 md:w-full max-w-[240px] aspect-[2/3] shadow-2xl"><BookCover book={book} className="w-full h-full rounded-lg" /></div>
+            </div>
+            <div className="flex-1 p-8 md:p-12 overflow-y-auto">
+              <div className="uppercase tracking-widest text-xs font-sans font-semibold text-amber-700 dark:text-amber-500 mb-3">{book.category} {book.subcategory && `• ${book.subcategory}`}</div>
+              <h2 className="text-3xl md:text-4xl font-serif font-medium text-stone-900 dark:text-stone-100 mb-8 leading-tight">{book.title}</h2>
+              <div className="flex flex-wrap gap-4 mb-8">
+                <button onClick={() => onRead(book)} className="flex items-center gap-2 bg-stone-900 dark:bg-stone-100 text-white dark:text-stone-900 px-8 py-3 rounded-full font-sans font-medium hover:bg-stone-800 dark:hover:bg-white transition-colors"><BookOpen size={18} />Read Now</button>
+                <button onClick={() => onToggleFavorite(book.id)} className={`flex items-center justify-center w-12 h-12 rounded-full border transition-colors ${isFavorite ? 'border-amber-600 text-amber-600 bg-amber-50 dark:border-amber-500 dark:text-amber-500 dark:bg-amber-500/10' : 'border-stone-200 text-stone-500 hover:border-stone-300 dark:border-stone-700 dark:text-stone-400'}`}><Heart size={20} fill={isFavorite ? "currentColor" : "none"} /></button>
+                <a href={rawPdfUrl} download target="_blank" rel="noreferrer" className="flex items-center justify-center w-12 h-12 rounded-full border border-stone-200 dark:border-stone-700 text-stone-500 dark:text-stone-400 hover:border-stone-300 transition-colors"><Download size={20} /></a>
+              </div>
+              <div className="prose prose-stone dark:prose-invert font-sans text-stone-600 dark:text-stone-400 text-sm leading-relaxed">
+                <p>No detailed description is available for this title.</p>
+              </div>
+              <div className="mt-8 pt-6 border-t border-stone-100 dark:border-stone-800 grid grid-cols-2 gap-4 text-sm font-sans">
+                <div><span className="block text-stone-400 mb-1">Format</span><span className="text-stone-800 dark:text-stone-200 font-medium">PDF Document</span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    };
+
+    // ============================================================================
+    // MAIN APP COMPONENT
+    // ============================================================================
+
+    function App() {
+      const [isDark, setIsDark] = useDarkMode();
+      const { favorites, toggleFavorite, history, addToHistory } = useUserLibrary();
+      
+      const [books, setBooks] = useState([]);
+      const [searchQuery, setSearchQuery] = useState('');
+      const [loading, setLoading] = useState(true);
+      const [error, setError] = useState(null);
+      
+      const [selectedBook, setSelectedBook] = useState(null);
+      const [readingBook, setReadingBook] = useState(null);
+
+      useEffect(() => {
+        async function fetchRepository() {
+          setLoading(true);
+          setError(null);
+          try {
+            const repoRes = await fetchGithubApi('');
+            let currentBranch = CONFIG.GITHUB_BRANCH;
+            
+            if (repoRes.ok) {
+              const repoData = await repoRes.json();
+              currentBranch = repoData.default_branch || currentBranch;
+            }
+
+            const resTree = await fetchGithubApi(`/git/trees/${currentBranch}?recursive=1`);
+            if (resTree.ok) {
+              const treeData = await resTree.json();
+              const allPdfs = treeData.tree
+                .filter(item => item.path.toLowerCase().endsWith('.pdf'))
+                .map(item => {
+                   const rawName = item.path.split('/').pop().replace(/\.pdf$/i, '');
+                   let title = rawName.replace(/[-_]/g, ' ');
+                   let category = 'PDF Document';
+
+                   if (rawName.includes(' - ')) {
+                     const parts = rawName.split(' - ');
+                     title = parts[1].trim();
+                   }
+
+                   const known = KNOWN_METADATA[rawName] || KNOWN_METADATA[title] || KNOWN_METADATA[item.path];
+                   if (known) {
+                     if (known.title) title = known.title;
+                     if (known.category) category = known.category;
+                   }
+
+                   return {
+                     id: item.path,
+                     file: item.path,
+                     title: title,
+                     category: category,
+                     branch: currentBranch
+                   };
+                });
+              setBooks(allPdfs);
+            } else {
+              throw new Error("Failed to load repository data.");
+            }
+          } catch (err) {
+            console.error(err);
+            setError("Could not load library. Please ensure the repository is public and has files.");
+          } finally {
+            setLoading(false);
+          }
+        }
+        fetchRepository();
+      }, []);
+
+      const filteredBooks = books.filter(book => 
+        book.title.toLowerCase().includes(searchQuery.toLowerCase())
+      );
+
+      if (loading) {
+        return (
+          <div className="min-h-screen flex items-center justify-center">
+            <div className="w-12 h-12 border-4 border-amber-200 border-t-amber-700 rounded-full animate-spin"></div>
+          </div>
+        );
+      }
+
+      if (error) {
+        return (
+          <div className="min-h-screen flex items-center justify-center p-6">
+            <div className="bg-rose-50 text-rose-600 p-8 rounded-3xl border border-rose-200 text-center max-w-lg">
+              <AlertCircle className="w-12 h-12 mx-auto mb-4" />
+              <h2 className="text-2xl font-serif mb-2">Connection Error</h2>
+              <p>{error}</p>
+            </div>
+          </div>
+        );
+      }
+
+      return (
+        <div className="min-h-screen flex flex-col font-sans text-stone-900 dark:text-stone-100">
+          <nav className="fixed top-0 left-0 right-0 z-30 glass-nav border-b border-stone-200/50 dark:border-stone-800/50">
+            <div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between gap-4 md:gap-8">
+              <div className="flex items-center gap-3 shrink-0">
+                <div className="w-8 h-8 bg-stone-900 dark:bg-stone-100 text-white dark:text-stone-900 flex items-center justify-center rounded-sm font-serif font-bold text-lg">R</div>
+                <span className="font-serif font-semibold text-lg tracking-wide hidden sm:block uppercase">The Reading Room</span>
+              </div>
+
+              <div className="flex-1 max-w-2xl relative">
+                <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-stone-400 w-5 h-5" />
+                <input 
+                  type="text" 
+                  placeholder="Search your library..." 
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full pl-12 pr-4 py-3 bg-stone-100 dark:bg-stone-900/50 border border-transparent focus:border-amber-500/50 rounded-full font-sans text-sm outline-none transition-all dark:text-white"
+                />
+              </div>
+
+              <div className="flex items-center shrink-0">
+                <button onClick={() => setIsDark(!isDark)} className="p-2 text-stone-500 hover:bg-stone-100 dark:hover:bg-stone-800 rounded-full transition-colors">
+                  {isDark ? <Sun size={20} /> : <Moon size={20} />}
+                </button>
+              </div>
+            </div>
+          </nav>
+
+          <main className="flex-1 pt-28 px-6 pb-12 max-w-7xl mx-auto w-full">
+            {!searchQuery && (
+              <div className="py-12 md:py-20 max-w-4xl animate-in fade-in slide-in-from-bottom-4 duration-1000">
+                <h1 className="text-4xl md:text-5xl lg:text-6xl font-serif text-stone-900 dark:text-stone-100 leading-tight mb-6">
+                  <span className="block font-cursive text-rose-700 dark:text-rose-500 text-6xl md:text-7xl lg:text-8xl mb-4 pr-4">Somewhere between</span>
+                  the pages, <br className="hidden md:block" /> you find yourself.
+                </h1>
+                <p className="text-lg md:text-xl text-stone-600 dark:text-stone-400 font-sans leading-relaxed max-w-2xl">
+                  A quiet corner of the internet for curious minds, beautiful stories and ideas worth remembering.
+                </p>
+                
+                <div className="mt-12 flex items-center gap-4 text-xs font-sans uppercase tracking-widest text-stone-400 dark:text-stone-500">
+                  <span className="h-[1px] w-12 bg-stone-300 dark:bg-stone-700"></span>
+                  Your Collection
+                  <span className="h-[1px] w-12 bg-stone-300 dark:bg-stone-700"></span>
+                </div>
+              </div>
+            )}
+
+            {searchQuery && (
+              <h2 className="text-xl font-sans font-medium mb-8 text-stone-500">
+                Search results for "{searchQuery}" ({filteredBooks.length})
+              </h2>
+            )}
+            
+            {filteredBooks.length > 0 ? (
+              <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-6">
+                {filteredBooks.map(book => <BookCard key={book.id} book={book} onClick={setSelectedBook} />)}
+              </div>
+            ) : (
+              <div className="text-center py-24 text-stone-500">
+                <Book className="w-12 h-12 mx-auto mb-4 opacity-20" />
+                <p className="text-lg">No books found.</p>
+              </div>
+            )}
+          </main>
+
+          <footer className="border-t border-stone-200/50 dark:border-stone-800/50 bg-stone-50/50 dark:bg-stone-900/20 py-16 mt-auto">
+            <div className="max-w-7xl mx-auto px-6 flex flex-col items-center justify-center text-center">
+              <div className="flex items-center gap-3 mb-6">
+                <div className="w-8 h-8 bg-stone-800 dark:bg-stone-200 text-white dark:text-stone-900 flex items-center justify-center rounded-sm font-serif font-bold text-lg">R</div>
+                <span className="font-serif italic text-2xl text-stone-800 dark:text-stone-200">The Reading Room</span>
+              </div>
+              <p className="text-stone-500 dark:text-stone-400 font-sans text-sm max-w-md mx-auto italic mb-8">
+                "A reader lives a thousand lives before he dies. The man who never reads lives only one."
+              </p>
+              <div className="text-[10px] tracking-[0.2em] uppercase font-sans text-stone-400">
+                Powered by GitHub • Crafted for readers
+              </div>
+            </div>
+          </footer>
+
+          <BookDetailsModal 
+            book={selectedBook} 
+            isOpen={!!selectedBook && !readingBook}
+            onClose={() => setSelectedBook(null)}
+            onRead={b => { addToHistory(b); setReadingBook(b); }}
+            isFavorite={selectedBook ? favorites.includes(selectedBook.id) : false}
+            onToggleFavorite={toggleFavorite}
+          />
+
+          {readingBook && <PDFReader book={readingBook} onClose={() => setReadingBook(null)} />}
+        </div>
+      );
+    }
+
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App />);
+  </script>
+</body>
+</html>
